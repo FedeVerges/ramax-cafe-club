@@ -1,0 +1,16 @@
+{
+  "name": "ramax-cafe-club",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.17.1",
+  "scripts": {
+    "build": "corepack pnpm --recursive run build",
+    "check": "corepack pnpm --recursive run check",
+    "dev:api": "corepack pnpm --filter @ramax/api dev",
+    "dev:web": "corepack pnpm --filter @ramax/web dev",
+    "test": "corepack pnpm --recursive run test"
+  },
+  "devDependencies": {
+    "drizzle-orm": "^0.44.5"
+  }
+}

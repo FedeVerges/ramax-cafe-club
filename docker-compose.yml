@@ -1,0 +1,14 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: ramax
+      POSTGRES_USER: ramax
+      POSTGRES_PASSWORD: ramax
+    ports:
+      - "5433:5432"
+    volumes:
+      - ramax_postgres:/var/lib/postgresql/data
+
+volumes:
+  ramax_postgres:

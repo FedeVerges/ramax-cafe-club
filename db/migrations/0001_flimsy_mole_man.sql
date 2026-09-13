@@ -1,0 +1,1 @@
+ALTER TABLE "inventory_balances" DROP CONSTRAINT "inventory_quantity_non_negative";
