@@ -1,263 +1,318 @@
 # Ramax Cafe Club. MVP funcional listo para desarrollo
 
-> Version 1.0. Fecha: 12 de septiembre de 2026.
+> Versión 1.1. Fecha: 26 de septiembre de 2026.
 >
-> Este documento define el primer producto operable. Ramax no reemplaza LibreOffice de un dia para otro: registra productos, ventas y fidelizacion sin frenar la caja actual.
+> Este documento define el primer producto operable con enfoque local-first. El objetivo no es reemplazar LibreOffice de un día para otro, sino que la caja pueda operar sin depender de internet ni de servicios cloud para vender, descontar stock y dejar auditoría clara.
 
-## 1. Objetivo y limite del MVP
+## 1. Objetivo del MVP
 
-El circuito que se debe validar es:
+El circuito principal que debe validarse es:
 
 ```text
-Descubrir Ramax Club -> entrar con Google -> comprar -> sumar puntos
--> volver -> canjear una recompensa
+Empezar a vender -> registrar productos -> cerrar venta -> descontar stock
+-> asociar socio opcional -> acreditar puntos
+-> revisar historial -> anular si hace falta
 ```
 
-El local debe poder vender aunque el cliente no sea socio, no quiera identificarse o haya un problema con el Club.
+La venta y la operación del local tienen prioridad sobre campañas, club social o estructura distribuida.
 
-| Incluido | Fuera del MVP |
-|---|---|
-| Google login, clientes, productos, ventas, stock simple, puntos, recompensas, QR de campana y administracion | Facturacion fiscal, integracion automatica con FUDO/POS, proveedores, recetas, costos, reservas, delivery, gamificacion y automatizaciones de marketing |
+### Incluido en el MVP
 
-## 2. Usuarios, roles y permisos
+- productos y stock
+- ventas y cierre de caja
+- stock y reversas
+- auditoría
+- usuarios con roles
+- asociación de socio a la venta
+- puntos básicos por compra
+- recompensas visibles y canjes simples
+- historial de ventas, saldo y movimientos
+
+### Fuera del MVP
+
+- facturación fiscal automática
+- integración rica con proveedores o ERP
+- recetas, costos, compras y producción
+- delivery, reservas ni logística compleja
+- marketing automation avanzado
+- microservicios, workers ni infraestructura distribuida prematura
+- campañas QR avanzadas como primera prioridad
+
+## 2. Principio de arquitectura
+
+El MVP debe ser local-first:
+
+- la caja opera en la sucursal sin internet,
+- cada sucursal tiene su base local de datos,
+- las transacciones y auditoría se resuelven localmente,
+- la sincronización con central es posterior y opcional,
+- la nube se usa para administración y reportes, no para cerrar ventas.
+
+Se mantiene un monolito modular, no se introducen microservicios ni colas para un problema aún no probado.
+
+## 3. Usuarios, roles y permisos
 
 | Rol | Puede hacer |
 |---|---|
-| Visitante | Abrir un QR de campana y ver la propuesta. |
-| Socio | Entrar con Google, mostrar su QR, consultar puntos, reclamar una campana y pedir un canje. |
-| Empleado | Crear ventas, asociar un socio a una venta, ver stock, iniciar y validar canjes. |
-| Administrador | Todo lo del empleado, administrar productos, stock, reglas de puntos, recompensas, campanas, usuarios y ajustes. |
+| Visitante | ver el club y la propuesta si aplica |
+| Socio | consultar saldo, historial, QR y canjes propios |
+| Empleado | vender, asociar socio, consultar stock, validar y cancelar canjes simples |
+| Administrador | todo lo del empleado, administrar catálogo, stock, usuarios, permisos, puntos y auditoría |
 
 Reglas de acceso:
 
-- El sistema aplica permisos en servidor. Ocultar un boton no basta.
-- Un empleado no puede editar una venta cerrada, un movimiento de puntos, ni un canje confirmado.
-- Todo cambio administrativo guarda autor, fecha, motivo y valores anterior/nuevo cuando aplique.
-- El socio solo accede a sus propios datos y beneficios.
+- la autorización se valida en servidor, no solo en la UI,
+- un empleado no puede editar una venta cerrada ni un canje validado,
+- todo cambio administrativo registra autor, fecha, motivo y valores relevantes,
+- un socio solo accede a sus propios datos y beneficios.
 
-## 3. Mapa del producto
+## 4. Mapa del producto
 
 ```text
-Cliente
-  Google login -> Mi Club -> Mi QR -> Puntos y movimientos -> Recompensas
-                     ^                         |
-Campana QR publica --+                         +-> Caja
+Operación local
+  productos -> stock -> ventas -> cobro -> reversa -> auditoría
+                               ^
+                               |
+                          socio opcional
+                               |
+                               v
+                           puntos
 
-Operacion
-  Productos y stock -> Nueva venta por items -> pago opcional -> cerrar venta
-                                                    |
-                                                    +-> socio opcional -> puntos
+Club
+  perfil -> QR -> saldo -> historial -> recompensas -> canjes
 
-Administracion
-  Productos | Importar/exportar | Regla de puntos | Recompensas | Campanas | Auditoria
+Administración
+  productos | stock | usuarios | permisos | recompensas | auditoría
 ```
 
-## 4. Modulo de identidad y membresia
+## 5. Identidad y membresía
 
 ### Objetivo
 
-Crear una cuenta de socio con la menor friccion posible y sin atar el modelo a un unico proveedor.
-
-### Flujo
-
-```text
-[Continuar con Google]
-          |
-          v
-Google autoriza identidad
-          |
-          +-> identidad existente: ingresar
-          |
-          +-> identidad nueva: crear socio activo y entrar
-                                  |
-                                  +-> pedir telefono y fecha de nacimiento, ambos opcionales
-```
+Crear una cuenta de socio con la menor fricción posible, sin atar el negocio a un único proveedor.
 
 ### Reglas
 
-- Google entrega el nombre, email verificado y un identificador estable del proveedor.
-- La cuenta se crea en el primer acceso exitoso. No hay contraseña propia.
-- Telefono y fecha de nacimiento se pueden completar, editar u omitir.
-- Cada socio tiene un QR opaco y no adivinable. El QR identifica al socio, nunca contiene el saldo.
-- La tabla `Identity` permite sumar Apple, email magico u otros metodos despues, sin migrar `ClubMember`.
-- Si Google no devuelve email, el sistema no crea la membresia y explica el motivo.
+- el sistema admite login interno para empleados/admin,
+- la integración con Google puede agregarse después sin romper la estructura,
+- cada socio cuenta con QR opaco y no adivinable,
+- el QR identifica al socio, nunca el saldo,
+- si la cuenta queda suspendida o eliminada, la misma no puede usar beneficios ni validar canjes,
+- la auditoría conserva el historial aunque se anonimice una cuenta.
 
 ### Estados
 
 ```text
-ClubMember: ACTIVE | SUSPENDED | DELETED
-Identity:   ACTIVE | REVOKED
+User: ACTIVE | INACTIVE
+Member: ACTIVE | SUSPENDED | DELETED
 ```
 
-Solo un administrador puede pasar una membresía a `DELETED`. La anonimización elimina nombre, email, teléfono, fecha de nacimiento e identidades de acceso, invalida sesiones y QR, y muestra los registros conservados como "Usuario eliminado". No borra ventas, movimientos de stock o puntos, ni canjes históricos requeridos para auditoría.
+La anonimización elimina datos personales, invalida sesiones y QR, pero no borra ventas, movimientos ni canjes históricos.
 
-### Criterios de aceptacion
+### Criterios de aceptación
 
-- Un usuario nuevo entra con una sola accion de autenticacion y llega a "Mi Club" con una membresia creada.
-- Un usuario que ya ingreso vuelve a su misma membresia y conserva su historial.
-- Telefono ausente no impide registro, compra, acumulacion ni canje.
-- Un QR de socio invalido, suspendido o inexistente no permite acreditar puntos ni validar canjes.
+- un usuario puede entrar a su perfil y ver su estado,
+- un QR inválido o suspendido no permite acreditar puntos ni validar canjes,
+- un socio puede ser asociado a una venta y recibir puntos por la compra,
+- una cuenta eliminada conserva trazabilidad sin seguir usando el sistema.
 
-## 5. Modulo de productos vendibles y stock
+## 6. Productos y stock
 
 ### Alcance
 
-Un producto vendible es todo item que se puede agregar a una venta. El MVP usa stock por producto, no recetas ni insumos compuestos.
+El MVP cubre productos vendibles por unidad, sin recetas ni insumos compuestos.
 
 Campos de `Product`:
 
 | Campo | Regla |
 |---|---|
-| nombre, SKU opcional, categoria opcional | El nombre es obligatorio. SKU no se repite si existe. |
-| precio actual | Mayor que cero. Los precios historicos viven en la venta. |
-| controlaStock | Define si descuenta stock. |
-| stockActual, stockMinimo | Cantidades enteras mayores o iguales a cero. Valor inicial trazable. |
-| activo | Un producto inactivo no se agrega a ventas nuevas. |
+| nombre | obligatorio |
+| SKU | opcional y único si existe |
+| precio actual | mayor a cero |
+| controlaStock | define si descuenta stock |
+| stockActual | entero mayor o igual a cero |
+| stockMinimo | integer y trazable |
+| activo | producto no se vende si está inactivo |
 
-### Flujos y reglas
+### Reglas
 
-```text
-Alta o importacion -> producto activo -> venta cerrada -> salida de stock
-                                      -> ajuste autorizado -> movimiento de stock
-```
+- cerrar venta descuenta stock una sola vez dentro de la misma transacción,
+- si `controlaStock = false`, la venta no genera movimiento de stock,
+- el stock no puede quedar negativo por defecto,
+- cada ajuste genera un `StockMovement` con motivo,
+- desactivar un producto no elimina el historial de ventas ni movimientos anteriores.
 
-- Cerrar una venta descuenta stock una sola vez, dentro de la misma transaccion que la venta.
-- Si `controlaStock = false`, la venta no crea movimiento de stock.
-- Stock negativo se bloquea por defecto. Un administrador puede permitirlo en una operacion puntual con motivo registrado.
-- Corregir stock crea un movimiento `ADJUSTMENT`; nunca se cambia `stockActual` sin registro.
-- Desactivar un producto conserva sus ventas y movimientos previos.
-
-### Estados y movimientos
+### Estados
 
 ```text
-Product:        ACTIVE | INACTIVE
-StockMovement:  OPENING | SALE | SALE_REVERSAL | ADJUSTMENT | IMPORT
+Product: ACTIVE | INACTIVE
+StockMovement: OPENING | SALE | SALE_REVERSAL | ADJUSTMENT | IMPORT
 ```
 
-### Criterios de aceptacion
+### Criterios de aceptación
 
-- La lista de venta solo muestra productos activos.
-- Una venta de 2 unidades reduce el stock en 2 y deja un movimiento ligado a esa venta.
-- Cambiar luego el precio o desactivar el producto no altera ninguna venta anterior.
-- La pantalla muestra una alerta cuando `stockActual <= stockMinimo`.
+- la lista de venta muestra solo productos activos,
+- una venta de 2 unidades reduce el stock en 2,
+- el cambio de precio no altera ventas anteriores,
+- la pantalla alerta cuando `stockActual <= stockMinimo`.
 
-## 6. Modulo de ventas y caja
+## 7. Venta y caja
 
-### Flujo de venta
+### Flujo principal
 
 ```text
 Nueva venta
-  -> buscar/tocar producto
+  -> buscar producto
   -> agregar items y cantidades
-  -> asociar socio, opcional
-  -> elegir medio de pago, opcional
-  -> [Cobrar]
-  -> venta cerrada + stock + puntos si hay socio
-```
-
-Ejemplo de pantalla:
-
-```text
-NUEVA VENTA                                      #1284
-Buscar producto...
-
-2 x Cappuccino                              $10.000
-1 x Medialuna                                $1.500
---------------------------------------------------
-TOTAL                                       $11.500
-
-SOCIO            [ + Agregar miembro ]
-PAGO             [ + Registrar pago ]       opcional
-
-                         [ COBRAR $11.500 ]
+  -> asociar socio opcional
+  -> elegir medio de pago opcional
+  -> cobrar
+  -> cerrar venta
+  -> descontar stock
+  -> acreditar puntos si corresponde
 ```
 
 ### Reglas
 
-- Una venta tiene uno o mas `SaleItem`. Cada item guarda producto, nombre, precio unitario, cantidad entera, subtotal e impuestos si se agregan luego.
-- Una venta puede cerrar sin socio y sin medio de pago. Nunca puede cerrar sin items ni con total menor o igual a cero.
-- Medios de pago del MVP: `CASH`, `TRANSFER`, `MERCADO_PAGO`, `CARD`, `OTHER`. El campo puede quedar vacio.
-- El precio de venta se copia al item. Cambiar el precio actual no cambia la historia.
-- El boton de cobro usa una clave de idempotencia. Un doble toque o reintento no crea dos ventas, dos descuentos de stock ni dos acreditaciones.
-- La asociacion de socio se permite al crear la venta y tambien después, sin límite de tiempo, mientras esté cerrada, no anulada y aún no tenga socio. La acción del empleado y su registro de auditoría bastan para acreditar la asociación; el MVP no exige comprobante adicional.
-- Al asociar un socio despues del cierre, el sistema acredita los puntos de inmediato usando la regla vigente en ese momento. No aplica la regla de la fecha original de venta.
-- Una venta ya asociada no puede reasignarse. Un administrador debe anularla y crear una correccion documentada si hay error.
+- una venta contiene varios `SaleItem` con producto, cantidad, precio unitario y subtotal,
+- puede cerrarse con o sin socio y con o sin pago registrado,
+- no puede cerrarse con total inválido ni sin items,
+- el precio se copia al item para preservar historial,
+- el cobro usa idempotency key para evitar doble pago o doble acreditación,
+- asociar socio a una venta cerrada solo se permite si el flujo lo soporta y queda registrado,
+- anular una venta restaura stock y revierte puntos si aplica, sin borrar el historial.
 
 ### Estados
 
 ```text
 Sale: DRAFT -> CLOSED
       DRAFT -> VOID
-      CLOSED -> VOID, solo administrador y con motivo
+      CLOSED -> VOID
 ```
 
-Anular una venta genera movimientos compensatorios de stock y puntos. Si la venta tenía un pago registrado, Ramax registra su estado como devuelto, pues la devolución se considera realizada al anular. No borra filas ni reescribe los movimientos originales.
+### Criterios de aceptación
 
-### Criterios de aceptacion
+- un empleado puede cerrar una venta con varios productos y sin socio,
+- un socio asociado recibe puntos una sola vez,
+- un doble toque al cobrar no duplica la venta,
+- anular una venta restaura stock y queda trazada con motivo.
 
-- El empleado registra una venta con varios productos, sin socio y sin pago, y el sistema la cierra.
-- Una venta con socio acredita los puntos una vez y muestra el resultado antes de cobrar.
-- El empleado puede encontrar un socio por QR, numero de socio, nombre, email o telefono si existe.
-- Asociar un socio a una venta previa crea una sola acreditacion y deja quien hizo la asociacion.
-- Anular una venta restaura stock y revierte su acreditacion, sin eliminar el historial.
-
-## 7. Importacion y exportacion compatible con LibreOffice
-
-### Objetivo
-
-Permitir una adopcion gradual. El equipo puede seguir trabajando con LibreOffice mientras Ramax empieza a concentrar ventas, stock y fidelizacion.
-
-### Formatos y contratos
-
-| Operacion | Formato | Hojas o columnas minimas |
-|---|---|---|
-| Importar productos | `.csv` UTF-8 o `.xlsx` | `sku`, `nombre`, `precio`, `controla_stock`, `stock_actual`, `stock_minimo`, `activo` |
-| Importar stock | `.csv` UTF-8 o `.xlsx` | `sku`, `cantidad`, `tipo`, `motivo`, `fecha_opcional` |
-| Importar ventas historicas | `.csv` UTF-8 o `.xlsx` | `referencia_venta`, `fecha`, `sku`, `cantidad`, `precio_unitario`, `medio_pago_opcional`, `socio_opcional` |
-| Exportar productos, stock, ventas y movimientos | `.csv` UTF-8 y `.xlsx` | Una hoja o archivo por entidad, con fechas ISO 8601 y separador decimal estable |
-
-### Reglas
-
-- El administrador primero descarga la plantilla oficial. La importacion valida encabezados, tipos, referencias y duplicados antes de escribir.
-- Cada fila trae resultado `CREATED`, `UPDATED`, `SKIPPED` o `ERROR`, con numero de fila y causa.
-- No se aplica una importacion parcialmente valida sin confirmacion del administrador. Se puede elegir "rechazar todo" o "importar filas validas".
-- `referencia_venta` funciona como clave de idempotencia de ventas importadas.
-- Importar ventas cerradas crea items y stock. Por defecto no acredita puntos, para no premiar retroactivamente ni duplicar acreditaciones. El administrador puede habilitar esa acreditacion por lote solo si el socio se pudo resolver.
-- Las exportaciones no sustituyen la auditoria interna. Son una copia interoperable para LibreOffice.
-
-### Criterios de aceptacion
-
-- Un `.xlsx` creado y guardado por LibreOffice se importa con acentos, precios y fechas correctos.
-- Reimportar el mismo archivo de ventas no duplica ventas, stock ni puntos.
-- Una fila con SKU desconocido informa el error y no crea una venta incompleta.
-- Un administrador puede exportar ventas, productos, stock y puntos en formatos que LibreOffice abre sin pasos manuales.
-
-## 8. Motor de puntos
+## 8. Puntos y fidelización
 
 ### Regla configurable
 
-La configuracion global define `pesosPorPunto`. Por ejemplo:
+La regla global define `pesosPorPunto`.
+
+Ejemplo:
 
 ```text
 1 punto cada $100
-
-Cappuccino  $5.000  = 50 puntos
-5 cappuccinos         = 250 puntos
-Recompensa: cafe      = 250 puntos
-Leyenda: "5 cappuccinos te dan un cafe gratis"
 ```
 
-La interfaz administrativa calcula equivalencias con los productos actuales y la recompensa elegida. Es una ayuda de lectura, no una regla alternativa.
+El sistema debe:
 
-### Calculo y vigencia
+- calcular puntos por compra usando la regla vigente al momento del cierre,
+- llevar un libro inmutable de movimientos,
+- mantener vencimiento por lote,
+- evitar recalcular histórica por cambios en la regla.
+
+### Reglas clave
+
+- el saldo se calcula a partir del libro de movimientos,
+- el vencimiento se define por la fecha de acreditación,
+- una reversa o anulación devuelve los puntos de la misma forma que descuenta stock,
+- un socio solo puede ver su historial y saldo propios.
+
+## 9. Recompensas y canjes
+
+### Alcance
+
+El MVP incluye un catálogo simple de recompensas y una validación básica del canje en caja.
+
+Incluye:
+
+- recompensa con nombre, costo, vigencia y cupo si aplica,
+- solicitud del socio,
+- emisión de ticket,
+- validación única por empleado,
+- vencimiento y cancelación con devolución exacta,
+- historial para socio y operación.
+
+### Reglas
+
+- la recompensa no puede validarse dos veces,
+- el costo se descuenta del saldo del socio,
+- si se cancela o vence, los puntos vuelven al saldo,
+- una validación requiere autorización y queda registrada en auditoría.
+
+## 10. Importación y coexistencia con LibreOffice
+
+El objetivo es reducir la doble carga y permitir migración gradual.
+
+### Formatos aceptados
+
+- `.csv` UTF-8
+- `.xlsx`
+
+### Casos incluidos
+
+- importación de productos,
+- stock inicial y ajustes,
+- importación de ventas históricas,
+- exportación de ventas, productos y puntos.
+
+### Reglas
+
+- cada lote se valida antes de aplicarse,
+- el administrador decide si acepta solo filas válidas o rechaza todo,
+- filas inválidas no crean datos parciales,
+- importaciones se registran en auditoría,
+- la importación no reemplaza la operación crítica del sistema local.
+
+## 11. Campañas QR
+
+Las campañas QR no son la prioridad del primer hito. Aparecen después de la caja y la fidelización básica.
+
+Se contemplan como:
+
+- QR público para landing y participación,
+- beneficio simple basado en puntos,
+- participación única por socio,
+- métricas básicas de escaneo y participación.
+
+## 12. Calidad mínima exigida
+
+- pruebas automáticas de reglas y permisos,
+- pruebas de integración para transacciones,
+- prueba de punta a punta del flujo principal,
+- registro de auditoría desde E1,
+- idempotencia en cobro y validación,
+- no edición destructiva de ventas, stock, puntos ni canjes.
+
+## 13. Orden recomendado de ejecución
 
 ```text
-puntos acreditados = piso(total elegible / pesosPorPunto)
-vencimiento = fecha de acreditacion + 365 dias
+E0: base ejecutable
+E1: caja operativa local
+E2: socios y puntos
+E3: recompensas y canjes
+E4: LibreOffice y migración
+E5: campañas QR
+E6: métricas, sincronización y lanzamiento
 ```
 
-- La regla activa se usa al acreditar. Cambiarla toma efecto inmediato para acreditaciones futuras.
-- Nunca se recalculan ventas, acreditaciones, vencimientos ni saldos historicos.
+## 14. Primer hito de valor real
+
+El primer hito no es “backend listo”, sino que un empleado pueda:
+
+- crear productos,
+- cargar stock,
+- vender varios items,
+- cierre la operación,
+- anular la venta si hace falta,
+- ver el historial y la auditoría.
+
+Ese corte es el que entrega valor real al negocio y deja la base para club, puntos y canjes sin introducir complejidad innecesaria ni dependencia de la nube.
 - Los puntos solo vencen si fueron acreditados. Un ajuste puede marcarse con vencimiento o sin vencimiento, segun su motivo.
 - El saldo disponible se calcula desde el libro de movimientos y lotes de puntos no vencidos.
 - Los canjes consumen lotes por FEFO: primero vence primero se usa.
