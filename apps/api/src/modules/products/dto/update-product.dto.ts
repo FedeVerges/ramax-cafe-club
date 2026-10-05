@@ -1,9 +1,22 @@
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import type { UpdateProductInput } from "../../../../../../packages/contracts/src";
+import { Transform } from "class-transformer";
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+  Max,
+} from "class-validator";
 
-export class UpdateProductDto {
+export class UpdateProductDto implements UpdateProductInput {
   @IsOptional()
   @IsString()
+  @MinLength(1)
   @MaxLength(160)
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   name?: string;
 
   @IsOptional()
@@ -22,6 +35,7 @@ export class UpdateProductDto {
 
   @IsOptional()
   @IsInt()
+  @Max(2147483647)
   @Min(1)
   priceArs?: number;
 

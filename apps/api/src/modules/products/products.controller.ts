@@ -1,4 +1,15 @@
-import { Body, Controller, Get, Patch, Post, Query, UseGuards, Param } from "@nestjs/common";
+import {
+  Headers,
+  ParseUUIDPipe,
+  Body,
+  Controller,
+  Get,
+  Patch,
+  Post,
+  Query,
+  UseGuards,
+  Param,
+} from "@nestjs/common";
 import { ApiTags } from "@nestjs/swagger";
 import { CurrentUser } from "../../common/current-user.decorator";
 import type { AuthUser } from "../../common/auth-user";
@@ -23,13 +34,22 @@ export class ProductsController {
 
   @Post()
   @RequirePermissions("products.manage")
-  create(@CurrentUser() user: AuthUser, @Body() body: CreateProductDto) {
-    return this.productsService.create(user.id, body);
+  create(
+    @CurrentUser() user: AuthUser,
+    @Body() body: CreateProductDto,
+    @Headers("idempotency-key") key: string,
+  ) {
+    return this.productsService.create(user.id, body, key);
   }
 
   @Patch(":id")
   @RequirePermissions("products.manage")
-  update(@CurrentUser() user: AuthUser, @Param("id") productId: string, @Body() body: UpdateProductDto) {
-    return this.productsService.update(user.id, productId, body);
+  update(
+    @CurrentUser() user: AuthUser,
+    @Param("id", ParseUUIDPipe) productId: string,
+    @Body() body: UpdateProductDto,
+    @Headers("idempotency-key") key: string,
+  ) {
+    return this.productsService.update(user.id, productId, body, key);
   }
 }

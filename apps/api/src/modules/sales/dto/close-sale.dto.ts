@@ -1,25 +1,39 @@
+import type { CloseSaleInput } from "../../../../../../packages/contracts/src";
 import { Type } from "class-transformer";
-import { ArrayMinSize, IsArray, IsIn, IsInt, IsOptional, IsUUID, Min, ValidateNested } from "class-validator";
+import {
+  ArrayMinSize,
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsBoolean,
+  IsUUID,
+  Min,
+  ValidateNested,
+  Max,
+} from "class-validator";
 
-const PAYMENT_METHODS = ["cash", "transfer", "mercado_pago", "card", "other"] as const;
+const PAYMENT_METHODS = ["cash", "transfer"] as const;
 
 export class SaleItemDto {
   @IsUUID()
   productId!: string;
 
   @IsInt()
+  @Max(2147483647)
   @Min(1)
   quantity!: number;
 }
 
-export class CloseSaleDto {
+export class CloseSaleDto implements CloseSaleInput {
+  @IsInt() @Max(2147483647) @Min(1) expectedTotalArs!: number;
+  @IsOptional() @IsBoolean() transferConfirmed?: boolean;
   @IsArray()
   @ArrayMinSize(1)
   @ValidateNested({ each: true })
   @Type(() => SaleItemDto)
   items!: SaleItemDto[];
 
-  @IsOptional()
   @IsIn(PAYMENT_METHODS)
-  paymentMethod?: (typeof PAYMENT_METHODS)[number];
+  paymentMethod!: (typeof PAYMENT_METHODS)[number];
 }

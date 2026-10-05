@@ -14,6 +14,7 @@ export const DATABASE = Symbol("DATABASE");
       inject: [ConfigService],
       useFactory: (config: ConfigService) => {
         const pool = new Pool({ connectionString: config.getOrThrow<string>("DATABASE_URL") });
+        pool.on("error", () => console.error("Conexión de base interrumpida; se reconectará al próximo pedido."));
         return drizzle({ client: pool, schema });
       },
     },

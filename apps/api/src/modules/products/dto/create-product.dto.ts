@@ -1,8 +1,20 @@
+import type { CreateProductInput } from "../../../../../../packages/contracts/src";
 import { Transform } from "class-transformer";
-import { IsBoolean, IsInt, IsOptional, IsString, MaxLength, Min } from "class-validator";
+import {
+  IsBoolean,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+  MinLength,
+  Max,
+} from "class-validator";
 
-export class CreateProductDto {
+export class CreateProductDto implements CreateProductInput {
+  @Transform(({ value }) => (typeof value === "string" ? value.trim() : value))
   @IsString()
+  @MinLength(1)
   @MaxLength(160)
   name!: string;
 
@@ -21,6 +33,7 @@ export class CreateProductDto {
   description?: string;
 
   @IsInt()
+  @Max(2147483647)
   @Min(1)
   priceArs!: number;
 
@@ -31,12 +44,7 @@ export class CreateProductDto {
   @IsOptional()
   @Transform(({ value }) => Number(value))
   @IsInt()
-  @Min(0)
-  initialQuantity = 0;
-
-  @IsOptional()
-  @Transform(({ value }) => Number(value))
-  @IsInt()
+  @Max(2147483647)
   @Min(0)
   minimumQuantity = 0;
 }
