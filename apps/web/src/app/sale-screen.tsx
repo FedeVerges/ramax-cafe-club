@@ -1,148 +1,294 @@
-import { useEffect, useMemo, useState } from "react";
-import type { PaymentMethod, SaleProduct } from "@ramax/contracts";
+import { useRef, useState } from "react";
+import type {
+  CloseSaleInput,
+  ClosedSale,
+  PaymentMethod,
+  SaleProduct,
+} from "@ramax/contracts";
 import { Link } from "react-router-dom";
-import { closeSale, getSaleProducts } from "./session.ts";
-
-const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
-  { value: "cash", label: "Efectivo" },
-  { value: "mercado_pago", label: "Mercado Pago" },
-  { value: "transfer", label: "Transferencia" },
-  { value: "card", label: "Tarjeta" },
-  { value: "other", label: "Otro" },
-];
-
-type CartItem = { product: SaleProduct; quantity: number };
-
-function formatArs(amount: number): string {
-  return new Intl.NumberFormat("es-AR", { style: "currency", currency: "ARS", maximumFractionDigits: 0 }).format(amount);
-}
-
-function newIdempotencyKey(): string {
-  return globalThis.crypto?.randomUUID?.() ?? `sale-${Date.now()}-${Math.random().toString(16).slice(2)}`;
-}
-
+import { ApiError, closeSale } from "./session";
+import { money, Notice, useData } from "./ui";
+import { BrandButton } from "./brand-ui";
 export function SaleScreen() {
-  const [products, setProducts] = useState<SaleProduct[]>([]);
+  const products = useData<SaleProduct[]>("/products");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("cash");
-  const [loading, setLoading] = useState(true);
-  const [submitting, setSubmitting] = useState(false);
+  const [stage, setStage] = useState<"products" | "review" | "payment">(
+    "products",
+  );
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("");
+  const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [confirmed, setConfirmed] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<string>();
-  const [success, setSuccess] = useState<{ saleId: string; totalArs: number }>();
-
-  useEffect(() => {
-    void getSaleProducts()
-      .then((items) => setProducts(items.filter((item) => item.status === "active")))
-      .catch((cause: unknown) => setError(cause instanceof Error ? cause.message : "No pudimos cargar el catálogo."))
-      .finally(() => setLoading(false));
-  }, []);
-
-  const cart = useMemo<CartItem[]>(() => products.flatMap((product) => {
-    const quantity = quantities[product.id] ?? 0;
-    return quantity > 0 ? [{ product, quantity }] : [];
-  }), [products, quantities]);
-  const totalArs = cart.reduce((total, item) => total + item.product.priceArs * item.quantity, 0);
-
-  function changeQuantity(product: SaleProduct, delta: number) {
-    setError(undefined);
-    setQuantities((current) => {
-      let nextQuantity = Math.max(0, (current[product.id] ?? 0) + delta);
-      if (product.tracksStock) nextQuantity = Math.min(nextQuantity, product.quantity);
-      if (nextQuantity === 0) {
-        const { [product.id]: _, ...rest } = current;
-        return rest;
-      }
-      return { ...current, [product.id]: nextQuantity };
-    });
+  const [result, setResult] = useState<ClosedSale>();
+  const pending = useRef(false);
+  const attempt = useRef<{ key: string; input: CloseSaleInput } | undefined>(
+    undefined,
+  );
+  const cart = (products.data ?? [])
+    .filter((p) => quantities[p.id])
+    .map((p) => ({ product: p, quantity: quantities[p.id]! }));
+  const total = cart.reduce(
+    (sum, i) => sum + i.product.priceArs * i.quantity,
+    0,
+  );
+  function change(p: SaleProduct, delta: number) {
+    setQuantities((q) => ({
+      ...q,
+      [p.id]: Math.max(
+        0,
+        Math.min(
+          (q[p.id] ?? 0) + delta,
+          p.tracksStock ? p.quantity : Number.MAX_SAFE_INTEGER,
+        ),
+      ),
+    }));
   }
-
-  async function submitSale() {
-    if (cart.length === 0) return;
-    setSubmitting(true);
+  async function submit() {
+    if (pending.current || !cart.length) return;
+    pending.current = true;
+    setBusy(true);
     setError(undefined);
+    attempt.current ??= {
+      key: crypto.randomUUID(),
+      input: {
+        items: cart.map((i) => ({
+          productId: i.product.id,
+          quantity: i.quantity,
+        })),
+        paymentMethod: method,
+        expectedTotalArs: total,
+        transferConfirmed: confirmed,
+      },
+    };
     try {
-      const closed = await closeSale({
-        items: cart.map(({ product, quantity }) => ({ productId: product.id, quantity })),
-        paymentMethod,
-      }, newIdempotencyKey());
-      setSuccess(closed);
+      setResult(await closeSale(attempt.current.input, attempt.current.key));
       setQuantities({});
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "No pudimos cerrar la venta.");
+      setUncertain(false);
+      attempt.current = undefined;
+    } catch (e) {
+      setError((e as Error).message);
+      if (e instanceof ApiError && e.status >= 400 && e.status < 500) {
+        attempt.current = undefined;
+        setUncertain(false);
+        if (["PRICE_CHANGED", "INSUFFICIENT_STOCK"].includes(e.code ?? "")) {
+          products.reload();
+          setStage("review");
+        }
+      } else setUncertain(true);
     } finally {
-      setSubmitting(false);
+      pending.current = false;
+      setBusy(false);
     }
   }
-
-  if (success) {
+  function reset() {
+    setResult(undefined);
+    setQuantities({});
+    setStage("products");
+    setConfirmed(false);
+    setMethod("cash");
+    setError(undefined);
+    attempt.current = undefined;
+    products.reload();
+  }
+  if (result)
     return (
-      <section className="sale-result" aria-labelledby="sale-result-title">
+      <section className="panel sale-result">
         <p className="eyebrow">VENTA REGISTRADA</p>
-        <h1 id="sale-result-title">Listo.</h1>
-        <p>Se registró el cobro por {formatArs(success.totalArs)}.</p>
-        <p className="sale-result__code">Comprobante {success.saleId.slice(0, 8).toUpperCase()}</p>
-        <div className="sale-result__actions">
-          <button className="button button--primary" type="button" onClick={() => setSuccess(undefined)}>Nueva venta <span aria-hidden="true">+</span></button>
-          <Link className="back-link" to="/operacion">Volver a caja</Link>
-        </div>
+        <h1>Venta N.º {result.saleNumber}</h1>
+        <p>Se registró el cobro por {money(result.totalArs)}.</p>
+        <Link
+          className="button button--primary"
+          to={`/ventas/${result.saleId}`}
+        >
+          Ver e imprimir comprobante
+        </Link>
+        <button onClick={reset}>Nueva venta</button>
       </section>
     );
-  }
-
   return (
-    <section className="sale-screen" aria-labelledby="sale-title">
-      <Link className="back-link" to="/operacion">← Volver a caja</Link>
-      <p className="eyebrow">NUEVA VENTA</p>
-      <h1 id="sale-title">Tomar pedido</h1>
-      {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <div className="sale-layout">
-        <section className="sale-catalog" aria-label="Catálogo de productos">
-          <h2>Productos</h2>
-          {loading ? <p className="helper-text">Cargando catálogo...</p> : null}
-          {!loading && products.length === 0 ? <p className="helper-text">No hay productos activos para vender.</p> : null}
-          <div className="product-grid">
-            {products.map((product) => {
-              const unavailable = product.tracksStock && product.quantity < 1;
-              return (
-                <article className="product-card" key={product.id}>
-                  <p className="product-card__category">{product.category ?? "SIN CATEGORÍA"}</p>
-                  <h3>{product.name}</h3>
-                  <p className="product-card__price">{formatArs(product.priceArs)}</p>
-                  {product.tracksStock ? <p className={unavailable ? "stock-note stock-note--empty" : "stock-note"}>Stock: {product.quantity}</p> : <p className="stock-note">Sin control de stock</p>}
-                  <button className="button product-card__add" type="button" disabled={unavailable} onClick={() => changeQuantity(product, 1)}>
-                    {unavailable ? "Sin stock" : "Agregar"} <span aria-hidden="true">+</span>
+    <section>
+      <h1>
+        {stage === "products"
+          ? "Nueva venta"
+          : stage === "review"
+            ? "Revisar venta"
+            : "Cobrar venta"}
+      </h1>
+      <Notice error={error ?? products.error} />
+      {uncertain && (
+        <p role="alert">
+          La respuesta no llegó. Reintentá el mismo cobro o consultá Ventas
+          antes de iniciar otro.
+        </p>
+      )}
+      <fieldset disabled={busy || uncertain}>
+        <div className="sale-layout">
+          {stage === "products" && (
+            <div>
+              <div className="filters">
+                <label>
+                  Buscar producto
+                  <input
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </label>
+                <label>
+                  Categoría
+                  <select
+                    value={category}
+                    onChange={(e) => setCategory(e.target.value)}
+                  >
+                    <option value="">Todas</option>
+                    {[
+                      ...new Set(
+                        products.data?.map((p) => p.category).filter(Boolean),
+                      ),
+                    ].map((c) => (
+                      <option key={c} value={c!}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+              {products.loading && <p>Cargando catálogo…</p>}
+              <div className="product-grid">
+                {products.data
+                  ?.filter(
+                    (p) =>
+                      p.status === "active" &&
+                      p.name.toLowerCase().includes(search.toLowerCase()) &&
+                      (!category || p.category === category),
+                  )
+                  .map((p) => (
+                    <article className="product-card" key={p.id}>
+                      <small>{p.category ?? "Sin categoría"}</small>
+                      <h2>{p.name}</h2>
+                      <strong>{money(p.priceArs)}</strong>
+                      <p>
+                        {p.tracksStock
+                          ? `Stock: ${p.quantity}`
+                          : "Sin control de stock"}
+                      </p>
+                      <button
+                        disabled={
+                          p.tracksStock && (quantities[p.id] ?? 0) >= p.quantity
+                        }
+                        onClick={() => change(p, 1)}
+                      >
+                        Agregar
+                      </button>
+                    </article>
+                  ))}
+              </div>
+              {products.data?.length === 0 && (
+                <p>
+                  No hay productos. El administrador debe preparar el catálogo.
+                </p>
+              )}
+            </div>
+          )}
+          <div className="panel">
+            <h2>Pedido</h2>
+            {cart.length === 0 && <p>Agregá productos para empezar.</p>}
+            {cart.map(({ product: p, quantity }) => (
+              <div className="cart-line" key={p.id}>
+                <div>
+                  <strong>{p.name}</strong>
+                  <small>
+                    {money(p.priceArs)} c/u · {money(p.priceArs * quantity)}
+                  </small>
+                </div>
+                <div className="quantity-control">
+                  <button
+                    disabled={stage === "payment"}
+                    aria-label={`Quitar ${p.name}`}
+                    onClick={() => change(p, -1)}
+                  >
+                    −
                   </button>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-        <aside className="sale-cart" aria-label="Pedido actual">
-          <p className="eyebrow">PEDIDO</p>
-          <h2>{cart.length === 0 ? "Todavía vacío" : `${cart.length} producto${cart.length === 1 ? "" : "s"}`}</h2>
-          <div className="cart-lines">
-            {cart.map(({ product, quantity }) => (
-              <div className="cart-line" key={product.id}>
-                <div><h3>{product.name}</h3><p>{formatArs(product.priceArs)} c/u</p></div>
-                <div className="quantity-control" aria-label={`Cantidad de ${product.name}`}>
-                  <button type="button" onClick={() => changeQuantity(product, -1)} aria-label={`Quitar un ${product.name}`}>−</button>
                   <span>{quantity}</span>
-                  <button type="button" disabled={product.tracksStock && quantity >= product.quantity} onClick={() => changeQuantity(product, 1)} aria-label={`Agregar un ${product.name}`}>+</button>
+                  <button
+                    disabled={
+                      stage === "payment" ||
+                      (p.tracksStock && quantity >= p.quantity)
+                    }
+                    aria-label={`Agregar ${p.name}`}
+                    onClick={() => change(p, 1)}
+                  >
+                    +
+                  </button>
                 </div>
               </div>
             ))}
+            <div className="cart-total">
+              <span>Total</span>
+              <strong>{money(total)}</strong>
+            </div>
+            {stage === "payment" && (
+              <>
+                <label>
+                  Medio de pago
+                  <select
+                    value={method}
+                    onChange={(e) => {
+                      setMethod(e.target.value as PaymentMethod);
+                      setConfirmed(false);
+                    }}
+                  >
+                    <option value="cash">Efectivo</option>
+                    <option value="transfer">Transferencia</option>
+                  </select>
+                </label>
+                {method === "transfer" && (
+                  <label className="checkbox-field">
+                    <input
+                      type="checkbox"
+                      checked={confirmed}
+                      onChange={(e) => setConfirmed(e.target.checked)}
+                    />
+                    Confirmo que recibí la transferencia
+                  </label>
+                )}
+              </>
+            )}
+            {stage !== "payment" && (
+              <BrandButton
+                disabled={!cart.length}
+                onClick={() =>
+                  setStage(stage === "products" ? "review" : "payment")
+                }
+              >
+                {stage === "products" ? "Revisar venta" : "Continuar al cobro"}
+              </BrandButton>
+            )}
+            {stage !== "products" && (
+              <button onClick={() => setStage("products")}>
+                Agregar o quitar productos
+              </button>
+            )}
+            <button onClick={reset}>Cancelar venta</button>
           </div>
-          <label className="payment-select">Medio de pago
-            <select value={paymentMethod} onChange={(event) => setPaymentMethod(event.target.value as PaymentMethod)}>
-              {PAYMENT_METHODS.map((method) => <option key={method.value} value={method.value}>{method.label}</option>)}
-            </select>
-          </label>
-          <div className="cart-total"><span>Total</span><strong>{formatArs(totalArs)}</strong></div>
-          <button className="button button--primary button--block" type="button" disabled={cart.length === 0 || submitting} onClick={() => void submitSale()}>
-            {submitting ? "Registrando..." : "Cerrar venta"} <span aria-hidden="true">→</span>
-          </button>
-        </aside>
-      </div>
+        </div>
+      </fieldset>
+      {stage === "payment" && (
+        <BrandButton
+          disabled={
+            busy || !cart.length || (method === "transfer" && !confirmed)
+          }
+          onClick={() => void submit()}
+        >
+          {busy
+            ? "Registrando…"
+            : uncertain
+              ? "Reintentar el mismo cobro"
+              : "Confirmar cobro"}
+        </BrandButton>
+      )}
     </section>
   );
 }
