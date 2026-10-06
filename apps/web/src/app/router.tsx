@@ -8,6 +8,7 @@ import {
   Outlet,
   useLoaderData,
   useNavigate,
+  useLocation,
   useRouteError,
 } from "react-router-dom";
 import { apiRequest, getSession, staffLogin } from "./session";
@@ -34,7 +35,7 @@ function ErrorScreen() {
     </main>
   );
 }
-function Connectivity() {
+function Connectivity({ compact = false }: { compact?: boolean }) {
   const [status, setStatus] = useState("Comprobando servidor local…");
   useEffect(() => {
     let alive = true;
@@ -61,19 +62,21 @@ function Connectivity() {
       clearInterval(timer);
     };
   }, []);
-  return <small role="status">{status}</small>;
+  return <small className={status.includes("Internet disponible") ? "connection-online" : "connection-pending"} role="status" title={status}>{compact && <RamaxIcon name="connection" size={10} weight="fill" />} {compact ? (status.includes("Comprobando") ? "Comprobando…" : status.includes("Sin internet") ? "Sin internet" : status.includes("Internet disponible") ? "En línea" : status.includes("no disponible") ? "Sin conexión local" : "Internet sin verificar") : status}</small>;
 }
 function Layout() {
   const session = useLoaderData() as Session;
+  const { pathname } = useLocation();
+  const sales = pathname === "/operacion" || pathname.startsWith("/ventas");
   if (!session.authenticated) return <Navigate to="/login" replace />;
   const admin = session.user.primaryRole === "admin";
   return (
-    <div className="local-layout">
+    <div className={`local-layout${sales ? " sales-shell" : ""}`}>
       <aside className="local-sidebar">
-        <RamaxBrand />
+        <RamaxBrand original={sales} />
         <nav aria-label="Navegación principal">
           {[
-            ["/operacion", "Caja", "home"],
+            ["/operacion", "Caja", sales ? "register" : "home"],
             ["/ventas", "Ventas", "sales"],
             ["/productos", "Productos", "products"],
             ["/inventario", "Inventario", "products"],
@@ -89,10 +92,17 @@ function Layout() {
               <span>{title}</span>
             </NavLink>
           ))}
+          {sales && <details className="sales-mobile-menu"><summary><RamaxIcon name="menu" size={28} weight="light" /><span>Más</span></summary><div>
+            <NavLink to="/productos">Productos</NavLink>
+            <NavLink to="/inventario">Inventario</NavLink>
+            {admin && <><NavLink to="/equipo">Equipo</NavLink><NavLink to="/copias">Copias de seguridad</NavLink></>}
+            <button onClick={() => { void apiRequest("/auth/logout", { method: "POST" }).then(() => location.assign("/login")); }}>Cerrar sesión</button>
+          </div></details>}
         </nav>
         <div className="staff-info">
           {session.user.displayName}
-          <small>{admin ? "Administrador" : "Empleado"}</small>
+          <small className="staff-role">{admin ? "Administrador" : "Empleado"}</small>
+          {sales && <div className="sales-staff-status"><span>SAN LUIS</span><Connectivity compact /></div>}
           <button
             onClick={() => {
               void apiRequest("/auth/logout", { method: "POST" }).then(() =>
@@ -105,7 +115,7 @@ function Layout() {
         </div>
       </aside>
       <main className="local-content">
-        <header className="local-status">
+        <header className={`local-status${sales ? " sales-desktop-status" : ""}`}>
           <span>San Luis</span>
           <Connectivity />
         </header>
