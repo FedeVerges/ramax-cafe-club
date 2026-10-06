@@ -46,13 +46,13 @@ test("prepara catálogo, vende sin internet, imprime y anula", async ({
   await page
     .locator("article")
     .filter({ hasText: productName })
-    .getByRole("button", { name: "Agregar", exact: true })
+    .getByRole("button", { name: `Agregar ${productName}`, exact: true })
     .click();
   await page
-    .getByRole("button", { name: "Revisar venta", exact: true })
+    .getByRole("button", { name: "Ver pedido", exact: true })
     .click();
   await page.getByRole("button", { name: "Continuar al cobro" }).click();
-  await page.getByLabel("Medio de pago").selectOption("transfer");
+  await page.getByRole("radio", { name: "Transferencia" }).check();
   await expect(
     page.getByRole("button", { name: "Confirmar cobro" }),
   ).toBeDisabled();
