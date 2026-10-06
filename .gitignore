@@ -28,5 +28,6 @@ var/
 playwright-report/
 test-results/
 visual-test-results/
+docs/design/comparisons/
 *.dump
 *.key
