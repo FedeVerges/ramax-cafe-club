@@ -16,9 +16,13 @@ async function bootstrap(): Promise<void> {
           key: readFileSync(process.env.TLS_KEY_FILE),
         }
       : undefined;
-  if (process.env.NODE_ENV === "production" && !tls)
+  if (
+    process.env.NODE_ENV === "production" &&
+    !tls &&
+    process.env.TRUST_PROXY_TLS !== "true"
+  )
     throw new Error(
-      "Configurá TLS_CERT_FILE y TLS_KEY_FILE para servir HTTPS local.",
+      "Configurá TLS_CERT_FILE y TLS_KEY_FILE, o TRUST_PROXY_TLS=true detrás de un proxy HTTPS.",
     );
   const app = await NestFactory.create<NestExpressApplication>(AppModule, {
     httpsOptions: tls,

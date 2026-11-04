@@ -243,7 +243,7 @@ Implementar:
 - Google login y alta automática;
 - perfil con nombre, email y teléfono opcional;
 - número de socio de seis dígitos;
-- regla global, libro, lotes, FEFO y vencimiento diario;
+- regla global, libro, lotes y vencimiento diario;
 - consultas del Socio y del Administrador;
 - caché local de socios;
 - outbox, inbox y sincronización idempotente;
@@ -257,6 +257,7 @@ Salida: una venta online u offline acredita puntos una sola vez y el socio los v
 Implementar:
 
 - catálogo y administración de recompensas;
+- café gratis como recompensa canjeable con puntos; su producto y costo se definirán antes de implementarlo;
 - cupo independiente del inventario local;
 - ticket con código manual, cantidad y vencimiento configurable;
 - débito de puntos y reserva de cupo al emitir;
@@ -269,7 +270,7 @@ Salida: solicitar, cancelar, vencer y validar un ticket conserva puntos y cupo c
 
 | Nivel | Escenarios mínimos |
 |---|---|
-| Unidad | cálculo y vencimiento de puntos, FEFO, permisos, stock, cantidad de canje y reversas |
+| Unidad | cálculo y vencimiento de puntos, permisos, stock, cantidad de canje y reversas |
 | Integración local | venta, pago, stock, numeración, auditoría, idempotencia, anulación y backup |
 | Integración cloud | Google, número único, libro, cupos, tickets e inbox idempotente |
 | Contrato | eventos de sincronización y respuestas del intermediario local |

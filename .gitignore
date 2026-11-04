@@ -12,6 +12,8 @@ coverage/
 .env.*
 !.env.example
 !.env.local.example
+!.env.cloud.example
+!deploy/pilot/.env.example
 
 # Use the workspace's pnpm lockfile
 package-lock.json

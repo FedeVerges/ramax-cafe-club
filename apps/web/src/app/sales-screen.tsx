@@ -1,10 +1,11 @@
 import { salesDate as date, salesDay, salesTime, salesMoney as money } from "./sales-format";
 import { useRef, useState, type FormEvent } from "react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useLocation, useParams } from "react-router-dom";
 import type { Page, SaleDetail, SaleSummary } from "@ramax/contracts";
 import { Notice, useData, useMutation } from "./ui";
 import { RamaxIcon, StatusPill } from "./brand-ui";
 import { useStaff } from "./staff-context";
+import { MemberPicker, useMemberPicker } from "./member-picker";
 type SalesFilters = {
   number: string;
   from: string;
@@ -17,6 +18,7 @@ const emptyFilters: SalesFilters = {
 };
 
 export function SalesScreen() {
+  const demo = useLocation().pathname.startsWith("/maquetas/admin");
   const [draft, setDraft] = useState<SalesFilters>(emptyFilters);
   const [applied, setApplied] = useState<SalesFilters>(emptyFilters);
   const [page, setPage] = useState(1);
@@ -95,7 +97,7 @@ export function SalesScreen() {
         {groups.map(([day, sales]) => <section className="sales-history-group" key={day}>
           <h2>{day === today ? `Hoy, ${day}` : day === yesterday ? `Ayer, ${day}` : day}</h2>
           <ul>{sales.map((sale) => <li key={sale.id}>
-            <Link className={`sales-history-item${sale.status === "void" ? " sales-history-item--void" : ""}`} to={`/ventas/${sale.id}`}>
+            <Link className={`sales-history-item${sale.status === "void" ? " sales-history-item--void" : ""}`} to={`${demo ? "/maquetas/admin" : ""}/ventas/${sale.id}`}>
               <div className="sales-history-row-top"><span className="sales-history-number">N.º {sale.saleNumber}<span> · {salesTime(sale.createdAt)}</span></span><strong>{money(sale.totalArs)}</strong></div>
               <div className="sales-history-row-bottom">
                 <div className="sales-history-meta"><span className="sales-history-payment">{sale.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}</span><span className="sales-history-staff"><RamaxIcon name="account" size={16} /><span title={sale.responsible}>{sale.responsible}</span></span></div>
@@ -115,9 +117,12 @@ export function SalesScreen() {
   );
 }
 export function SaleDetailScreen() {
+  const demo = useLocation().pathname.startsWith("/maquetas/admin");
   const { id } = useParams();
   const data = useData<SaleDetail>(`/sales/${id}`);
   const mutation = useMutation();
+  const attachMutation = useMutation();
+  const memberPicker = useMemberPicker();
   const admin = useStaff().user.primaryRole === "admin";
   const [confirmed, setConfirmed] = useState(false);
   const [reason, setReason] = useState("");
@@ -133,12 +138,20 @@ export function SaleDetailScreen() {
     )
       data.reload();
   }
+  async function attachMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (memberPicker.member?.status !== "active") return;
+    if (await attachMutation.run(`/sales/${id}/member`, { memberNumber: memberPicker.member.memberNumber })) {
+      memberPicker.reset();
+      data.reload();
+    }
+  }
   return (
     <section className="sales-ui sales-detail">
-      <Link className="sales-back no-print" to="/ventas">
+      <Link className="sales-back no-print" to={demo ? "/maquetas/admin/ventas" : "/ventas"}>
         <RamaxIcon name="back" /> Volver a ventas
       </Link>
-      <Notice error={data.error ?? mutation.error} success={mutation.success} />
+      <Notice error={data.error ?? mutation.error ?? attachMutation.error} success={mutation.success ?? attachMutation.success} />
       {data.loading ? (
         <p>Cargando…</p>
       ) : (
@@ -176,6 +189,8 @@ export function SaleDetailScreen() {
                   Total <strong>{money(sale.totalArs)}</strong>
                 </p>
                 <div className="sales-receipt-meta"><div><small>Forma de pago</small><p>{sale.paymentMethod === "cash" ? "Efectivo" : "Transferencia"}</p></div><div><small>Atendió</small><p>{sale.responsible}</p></div></div>
+                {sale.memberNumberLast4 && <p>Socio terminado en {sale.memberNumberLast4}</p>}
+                {sale.pointsEarned != null && sale.memberNumberLast4 && <p>{sale.pointsEarned} puntos · {sale.pointsSyncStatus === "confirmed" ? "Confirmados" : sale.pointsSyncStatus === "rejected" ? "No acreditados" : sale.pointsSyncStatus === "reversed" ? "Revertidos" : "Pendientes de sincronización"}</p>}
                 {sale.status === "void" && (
                   <p>
                     Anulada por {sale.voidedBy},{" "}
@@ -188,6 +203,12 @@ export function SaleDetailScreen() {
                   <RamaxIcon name="print" /> Imprimir comprobante
                 </button>
               </article>
+              {!demo && sale.status === "closed" && !sale.memberNumberLast4 && sale.pointsEarned != null && <form className="panel sales-member-attach no-print" onSubmit={(event) => void attachMember(event)}>
+                <h2>Asociar socio</h2>
+                <p>Disponible durante las 24 horas posteriores al cierre. Se aplicará la regla guardada en esta venta.</p>
+                <MemberPicker picker={memberPicker} />
+                <button className="button button--primary" disabled={memberPicker.member?.status !== "active" || attachMutation.busy}>Asociar socio y acreditar {sale.pointsEarned} puntos</button>
+              </form>}
               {admin && sale.status === "closed" && (
                 <form className="panel sales-void no-print" onSubmit={voidSale}>
                   <h2 className="sales-void-title"><RamaxIcon name="warning" size={36} />Anular venta completa</h2>

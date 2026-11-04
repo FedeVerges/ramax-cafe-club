@@ -19,6 +19,7 @@ import { SessionGuard } from "../auth/session.guard";
 import { CloseSaleDto } from "./dto/close-sale.dto";
 import { VoidSaleDto } from "./dto/void-sale.dto";
 import { SalesService } from "./sales.service";
+import { AttachMemberDto } from "./dto/attach-member.dto";
 
 @ApiTags("sales")
 @Controller("sales")
@@ -63,5 +64,16 @@ export class SalesController {
     @Headers("idempotency-key") key: string,
   ) {
     return this.salesService.void(user.id, saleId, body.reason, key);
+  }
+
+  @Post(":id/member")
+  @RequirePermissions("sales.create", "members.read")
+  attachMember(
+    @CurrentUser() user: AuthUser,
+    @Param("id", ParseUUIDPipe) saleId: string,
+    @Body() body: AttachMemberDto,
+    @Headers("idempotency-key") key: string,
+  ) {
+    return this.salesService.attachMember(user.id, saleId, body.memberNumber, key);
   }
 }

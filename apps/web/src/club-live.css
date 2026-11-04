@@ -1,0 +1,70 @@
+.club-live-loading {
+  display: grid;
+  min-height: 100dvh;
+  place-items: center;
+}
+.club-live .club-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-decoration: none;
+}
+.club-google {
+  min-height: 52px;
+  display: grid;
+  justify-items: center;
+}
+.club-google p,
+.club-live-error {
+  color: #9f3529;
+}
+.club-pilot-access {
+  display: grid;
+  gap: 10px;
+  width: min(100%, 320px);
+  margin: 12px auto;
+}
+.club-pilot-access label {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+}
+.club-pilot-access input {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #bcae96;
+  border-radius: 8px;
+}
+.club-pilot-access p {
+  color: #9f3529;
+}
+.club-live .club-segments a {
+  display: grid;
+  flex: 1;
+  place-items: center;
+  text-decoration: none;
+}
+.club-live-coming {
+  margin: 28px 0;
+  padding: 36px 20px;
+  text-align: center;
+  border-radius: 16px;
+  background: #f4efe5;
+}
+.club-live-coming h2 {
+  margin: 12px 0 6px;
+}
+.club-live .club-account-links form {
+  display: grid;
+  gap: 8px;
+  padding: 14px 0;
+}
+.club-live .club-account-links form label {
+  display: grid;
+  gap: 8px;
+}
+.club-live .club-account-links form button {
+  justify-content: center;
+  border-radius: 8px;
+  padding: 10px;
+}

@@ -6,6 +6,7 @@ import type {
   SaleProduct,
   Session,
 } from "@ramax/contracts";
+import { demoApiRequest } from "./demo-api";
 const apiBaseUrl = import.meta.env.VITE_API_URL ?? "/api/v1";
 export class ApiError extends Error {
   constructor(
@@ -20,6 +21,7 @@ export async function apiRequest<T>(
   path: string,
   init?: RequestInit,
 ): Promise<T> {
+  if (window.location.pathname.startsWith("/maquetas/admin")) return demoApiRequest<T>(path, init);
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl}${path}`, {

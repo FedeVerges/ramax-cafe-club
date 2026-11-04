@@ -22,6 +22,20 @@
       "when": 1791146722514,
       "tag": "0002_dizzy_corsair",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1791317516091,
+      "tag": "0003_good_mimic",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1791326749079,
+      "tag": "0004_perfect_weapon_omega",
+      "breakpoints": true
     }
   ]
 }

@@ -74,6 +74,15 @@ export const sales = pgTable("sales", {
   id: uuid("id").defaultRandom().primaryKey(),
   status: saleStatus("status").notNull().default("closed"),
   totalArs: integer("total_ars").notNull(),
+  memberId: uuid("member_id"),
+  memberNumber: varchar("member_number", { length: 6 }),
+  memberAttachedAt: timestamp("member_attached_at", { withTimezone: true }),
+  memberAttachedByUserId: uuid("member_attached_by_user_id").references(() => users.id, { onDelete: "restrict" }),
+  pointRuleVersion: integer("point_rule_version"),
+  pesosPorPunto: integer("pesos_por_punto"),
+  pointsEarned: integer("points_earned"),
+  pointsSyncStatus: varchar("points_sync_status", { length: 16 }).notNull().default("none"),
+  saleVersion: integer("sale_version").notNull().default(1),
   createdByUserId: uuid("created_by_user_id")
     .notNull()
     .references(() => users.id, { onDelete: "restrict" }),

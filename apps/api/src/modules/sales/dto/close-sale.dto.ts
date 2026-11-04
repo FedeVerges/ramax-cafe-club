@@ -11,6 +11,7 @@ import {
   Min,
   ValidateNested,
   Max,
+  Matches,
 } from "class-validator";
 
 const PAYMENT_METHODS = ["cash", "transfer"] as const;
@@ -36,4 +37,8 @@ export class CloseSaleDto implements CloseSaleInput {
 
   @IsIn(PAYMENT_METHODS)
   paymentMethod!: (typeof PAYMENT_METHODS)[number];
+
+  @IsOptional()
+  @Matches(/^[0-9]{6}$/)
+  memberNumber?: string;
 }

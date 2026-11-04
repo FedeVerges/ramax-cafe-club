@@ -7,10 +7,11 @@ import type {
   SaleProduct,
   SaleDetail,
 } from "@ramax/contracts";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { ApiError, closeSale } from "./session";
 import { Notice, useData } from "./ui";
 import { BrandButton, RamaxIcon } from "./brand-ui";
+import { MemberPicker, useMemberPicker } from "./member-picker";
 import { MinusIcon } from "@phosphor-icons/react/dist/csr/Minus";
 import { PlusIcon } from "@phosphor-icons/react/dist/csr/Plus";
 import { XIcon } from "@phosphor-icons/react/dist/csr/X";
@@ -26,6 +27,7 @@ function Quantity({ product, quantity, change }: { product: SaleProduct; quantit
 }
 
 function RegisteredSale({ result, reset }: { result: ClosedSale; reset: () => void }) {
+  const demo = useLocation().pathname.startsWith("/maquetas/admin");
   const detail = useData<SaleDetail>(`/sales/${result.saleId}`);
   return <section className="sales-ui sales-success">
     <span className="sales-success__icon"><RamaxIcon name="confirmed" size={42} /></span>
@@ -37,12 +39,14 @@ function RegisteredSale({ result, reset }: { result: ClosedSale; reset: () => vo
     <div className="sales-receipt-lines">{detail.data?.items.map((item, i) => <div className="sales-summary-line" key={i}><span>{item.quantity} × {item.productName}</span><strong>{money(item.subtotalArs)}</strong></div>)}</div>
     <div className="sales-total"><span>Total cobrado</span><strong>{money(result.totalArs)}</strong></div>
     {detail.data && <p>{detail.data.paymentMethod === "cash" ? "Efectivo" : "Transferencia"} · Atendió {detail.data.responsible}</p>}
+    {result.pointsSyncStatus === "pending" && <p className="sales-info" role="status">{result.pointsEarned} puntos pendientes de confirmación. El saldo del socio se actualizará al sincronizar.</p>}
     <BrandButton onClick={reset}>Nueva venta <RamaxIcon name="next" /></BrandButton>
-    <Link className="button button--secondary" to={`/ventas/${result.saleId}`}><RamaxIcon name="print" />Ver e imprimir comprobante</Link>
+    <Link className="button button--secondary" to={`${demo ? "/maquetas/admin" : ""}/ventas/${result.saleId}`}><RamaxIcon name="print" />Ver e imprimir comprobante</Link>
   </section>;
 }
 
 export function SaleScreen() {
+  const demo = useLocation().pathname.startsWith("/maquetas/admin");
   const products = useData<SaleProduct[]>("/products");
   const [quantities, setQuantities] = useState<Record<string, number>>({});
   const [stage, setStage] = useState<"products" | "review" | "payment">(
@@ -56,6 +60,7 @@ export function SaleScreen() {
   const [uncertain, setUncertain] = useState(false);
   const [error, setError] = useState<string>();
   const [result, setResult] = useState<ClosedSale>();
+  const memberPicker = useMemberPicker();
   const pending = useRef(false);
   const attempt = useRef<{ key: string; input: CloseSaleInput } | undefined>(
     undefined,
@@ -94,6 +99,7 @@ export function SaleScreen() {
         paymentMethod: method,
         expectedTotalArs: total,
         transferConfirmed: confirmed,
+        ...(memberPicker.member?.status === "active" ? { memberNumber: memberPicker.member.memberNumber } : {}),
       },
     };
     try {
@@ -122,6 +128,7 @@ export function SaleScreen() {
     setStage("products");
     setConfirmed(false);
     setMethod("cash");
+    memberPicker.reset();
     setError(undefined);
     attempt.current = undefined;
     products.reload();
@@ -159,6 +166,8 @@ export function SaleScreen() {
           </article>)}</div>
           {stage === "review" && <button className="sales-add-products" onClick={() => setStage("products")}><PlusIcon size={22} />Agregar productos</button>}
           <div className="sales-total"><span>Total</span><strong>{money(total)}</strong></div>
+          {!demo && stage === "review" && <MemberPicker picker={memberPicker} />}
+          {!demo && stage === "payment" && memberPicker.member?.status === "active" && <p className="sales-member__payment">Socio: {memberPicker.member.displayName} · N.º {memberPicker.member.memberNumber}. Los puntos se confirmarán en cloud.</p>}
           {stage === "payment" && <>
             <h2 className="sales-section-title">Medio de pago</h2>
             <div className="sales-payment" role="group" aria-label="Medio de pago">{(["cash", "transfer"] as const).map((value) => <label className={`sales-payment-option${method === value ? " is-selected" : ""}`} key={value}>

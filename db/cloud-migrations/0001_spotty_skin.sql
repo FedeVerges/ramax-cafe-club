@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_sales" ADD COLUMN "items" jsonb DEFAULT '[]'::jsonb NOT NULL;

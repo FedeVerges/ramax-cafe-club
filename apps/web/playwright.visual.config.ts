@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
-  testMatch: "sales-visual.spec.ts",
+  testMatch: ["sales-visual.spec.ts", "admin-visual.spec.ts", "club-visual.spec.ts", "mobile-demos-visual.spec.ts"],
   workers: 1,
   outputDir: "visual-test-results",
   use: {

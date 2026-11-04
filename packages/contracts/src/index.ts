@@ -51,6 +51,7 @@ export type CloseSaleInput = {
   paymentMethod: PaymentMethod;
   expectedTotalArs: number;
   transferConfirmed?: boolean;
+  memberNumber?: MemberNumber;
 };
 
 export type ClosedSale = {
@@ -58,6 +59,8 @@ export type ClosedSale = {
   status: "closed";
   totalArs: number;
   saleNumber: number;
+  pointsEarned?: number;
+  pointsSyncStatus?: SalePointsStatus;
 };
 
 export type CreateProductInput = {
@@ -107,6 +110,9 @@ export type SaleSummary = {
   voidedAt: string | null;
   paymentMethod: PaymentMethod;
   responsible: string;
+  memberNumberLast4?: string | null;
+  pointsEarned?: number | null;
+  pointsSyncStatus?: SalePointsStatus;
 };
 export type SaleDetail = SaleSummary & {
   items: Array<{
@@ -140,25 +146,106 @@ export type RecoveryJob = {
   error?: string;
 };
 export const STAFF_PERMISSIONS: Record<StaffRole, readonly string[]> = {
-  employee: ["products.read", "inventory.read", "sales.create", "sales.read"],
+  employee: ["products.read", "inventory.read", "sales.create", "sales.read", "members.read"],
   admin: [
     "products.read",
     "inventory.read",
     "sales.create",
     "sales.read",
+    "members.read",
     "products.manage",
     "inventory.adjust",
     "sales.void",
     "users.manage",
     "backups.manage",
+    "members.manage",
+    "points.manage",
   ],
 };
 
 export type RestoreBackupInput = { backupId: string; confirmed: true };
 export type VoidSaleInput = { reason: string; refundConfirmed: true };
+export type AttachMemberInput = { memberNumber: MemberNumber };
 export type UpdateProductInput = Partial<
   Pick<
     CreateProductInput,
     "name" | "sku" | "category" | "priceArs" | "tracksStock"
   >
 > & { active?: boolean; description?: string };
+
+export type MemberStatus = "active" | "suspended" | "anonymized";
+export { calculatePoints, isMemberNumber } from "./points";
+export type MemberNumber = string;
+export type ClubMemberProfile = {
+  id: string;
+  memberNumber: MemberNumber;
+  displayName: string | null;
+  email: string | null;
+  phone: string | null;
+  status: MemberStatus;
+  accessMethod: "google" | "pilot";
+};
+export type StaffMemberLookup = {
+  id: string;
+  memberNumber: MemberNumber;
+  displayName: string;
+  status: MemberStatus;
+  confirmedBalance: number;
+  syncedAt: string;
+  source: "cloud" | "cache";
+};
+export type PointMovement = {
+  id: string;
+  kind: "sale_credit" | "sale_reversal" | "expiry" | "adjustment";
+  delta: number;
+  description: string | null;
+  createdAt: string;
+};
+export type PointAccount = {
+  confirmedBalance: number;
+  movements: PointMovement[];
+  hasMore: boolean;
+};
+export type SalePointsStatus = "none" | "pending" | "confirmed" | "rejected" | "reversed";
+
+type SaleEventBase = {
+  schemaVersion: 1;
+  eventId: string;
+  sourceId: string;
+  saleId: string;
+  saleVersion: number;
+  occurredAt: string;
+};
+export type SaleClosedEvent = SaleEventBase & {
+  eventType: "sale.closed";
+  saleNumber: number;
+  totalArs: number;
+  closedAt: string;
+  memberId: string | null;
+  pointRuleVersion: number;
+  pesosPorPunto: number;
+  pointsEarned: number;
+  items: Array<{
+    productName: string;
+    quantity: number;
+    unitPriceArs: number;
+    subtotalArs: number;
+  }>;
+};
+export type SaleMemberAttachedEvent = SaleEventBase & {
+  eventType: "sale.member_attached";
+  memberId: string;
+};
+export type SaleVoidedEvent = SaleEventBase & {
+  eventType: "sale.voided";
+};
+export type SaleSyncEvent =
+  | SaleClosedEvent
+  | SaleMemberAttachedEvent
+  | SaleVoidedEvent;
+export type SaleSyncAck = {
+  eventId: string;
+  status: "accepted" | "deferred" | "rejected";
+  code?: string;
+  confirmedBalance?: number;
+};

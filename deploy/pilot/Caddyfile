@@ -1,0 +1,13 @@
+{$PILOT_DOMAIN} {
+  encode zstd gzip
+
+  route {
+    @integration path /api/v1/integration/*
+    respond @integration 404
+
+    @club path /api/v1/club/*
+    reverse_proxy @club cloud-api:3200
+
+    reverse_proxy local-api:3000
+  }
+}

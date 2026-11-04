@@ -6,6 +6,7 @@ import "./styles.css";
 import "./sales-fonts.css";
 import "./sales.css";
 import "./sales-history.css";
+import "./admin.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

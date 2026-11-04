@@ -5,9 +5,10 @@ import { ProductsModule } from "../products/products.module";
 import { AuthModule } from "../auth/auth.module";
 import { SalesController } from "./sales.controller";
 import { SalesService } from "./sales.service";
+import { ClubLocalModule } from "../club-local/club-local.module";
 
 @Module({
-  imports: [ProductsModule, InventoryModule, AuditModule, AuthModule],
+  imports: [ProductsModule, InventoryModule, AuditModule, AuthModule, ClubLocalModule],
   controllers: [SalesController],
   providers: [SalesService],
   exports: [SalesService],

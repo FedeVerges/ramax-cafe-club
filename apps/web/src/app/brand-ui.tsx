@@ -24,6 +24,12 @@ import { ArrowLeftIcon } from "@phosphor-icons/react/dist/csr/ArrowLeft";
 import { CaretRightIcon } from "@phosphor-icons/react/dist/csr/CaretRight";
 import { CircleIcon } from "@phosphor-icons/react/dist/csr/Circle";
 import { CheckIcon } from "@phosphor-icons/react/dist/csr/Check";
+import { MapPinIcon } from "@phosphor-icons/react/dist/csr/MapPin";
+import { EyeIcon } from "@phosphor-icons/react/dist/csr/Eye";
+import { EyeSlashIcon } from "@phosphor-icons/react/dist/csr/EyeSlash";
+import { PlusIcon } from "@phosphor-icons/react/dist/csr/Plus";
+import { PencilSimpleIcon } from "@phosphor-icons/react/dist/csr/PencilSimple";
+import { MegaphoneIcon } from "@phosphor-icons/react/dist/csr/Megaphone";
 
 export const ramaxIcons = {
   calendar: CalendarBlankIcon,
@@ -49,6 +55,12 @@ export const ramaxIcons = {
   search: MagnifyingGlassIcon,
   cart: ShoppingCartIcon,
   confirmed: CheckIcon,
+  location: MapPinIcon,
+  visible: EyeIcon,
+  hidden: EyeSlashIcon,
+  plus: PlusIcon,
+  edit: PencilSimpleIcon,
+  campaign: MegaphoneIcon,
 } satisfies Record<string, Icon>;
 
 export type RamaxIconName = keyof typeof ramaxIcons;

@@ -1,0 +1,130 @@
+name: ramax-pilot
+
+x-app-image: &app-image
+  build:
+    context: ../..
+    dockerfile: deploy/pilot/Dockerfile
+    args:
+      VITE_GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+  image: ramax-pilot-app:local
+
+services:
+  local-db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ramax
+      POSTGRES_USER: ramax
+      POSTGRES_PASSWORD: ${LOCAL_DB_PASSWORD:?Definir LOCAL_DB_PASSWORD}
+    volumes:
+      - local_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ramax -d ramax"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cloud-db:
+    image: postgres:17-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ramax_cloud
+      POSTGRES_USER: ramax_cloud
+      POSTGRES_PASSWORD: ${CLOUD_DB_PASSWORD:?Definir CLOUD_DB_PASSWORD}
+    volumes:
+      - cloud_db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ramax_cloud -d ramax_cloud"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  cloud-api:
+    <<: *app-image
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/apps/api/src/main-cloud.js"]
+    environment:
+      NODE_ENV: production
+      CLOUD_PORT: "3200"
+      CLOUD_DATABASE_URL: postgresql://ramax_cloud:${CLOUD_DB_PASSWORD}@cloud-db:5432/ramax_cloud
+      CLUB_WEB_ORIGIN: https://${PILOT_DOMAIN:?Definir PILOT_DOMAIN}
+      CLUB_SOURCE_ID: ${CLUB_SOURCE_ID:?Definir CLUB_SOURCE_ID}
+      CLUB_SERVICE_TOKEN: ${CLUB_SERVICE_TOKEN:?Definir CLUB_SERVICE_TOKEN}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-not-configured.invalid}
+      PILOT_MEMBER_LOGIN_ENABLED: ${PILOT_MEMBER_LOGIN_ENABLED:-false}
+      PILOT_MEMBER_ACCESS_CODE: ${PILOT_MEMBER_ACCESS_CODE:-}
+    depends_on:
+      cloud-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3200/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  local-api:
+    <<: *app-image
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/apps/api/src/main.js"]
+    environment: &local-env
+      NODE_ENV: production
+      TRUST_PROXY_TLS: "true"
+      PORT: "3000"
+      DATABASE_URL: postgresql://ramax:${LOCAL_DB_PASSWORD}@local-db:5432/ramax
+      WEB_ORIGIN: https://${PILOT_DOMAIN}
+      WEB_DIST_DIR: /app/apps/web/dist
+      BACKUP_DIR: /data/backups
+      MIGRATIONS_DIR: /app/db/migrations
+      RECOVERY_HEALTH_URL: http://local-api:3000/api/v1/health
+      CLUB_CLOUD_API_URL: http://cloud-api:3200/api/v1
+      CLUB_SOURCE_ID: ${CLUB_SOURCE_ID}
+      CLUB_SERVICE_TOKEN: ${CLUB_SERVICE_TOKEN}
+    volumes:
+      - local_backups:/data/backups
+    depends_on:
+      local-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/api/v1/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+
+  recovery-worker:
+    <<: *app-image
+    restart: unless-stopped
+    command: ["node", "apps/api/dist/apps/api/src/recovery-worker.js"]
+    environment: *local-env
+    volumes:
+      - local_backups:/data/backups
+    depends_on:
+      local-db:
+        condition: service_healthy
+      local-api:
+        condition: service_healthy
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PILOT_DOMAIN: ${PILOT_DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      local-api:
+        condition: service_healthy
+      cloud-api:
+        condition: service_healthy
+
+volumes:
+  local_db:
+  cloud_db:
+  local_backups:
+  caddy_data:
+  caddy_config:

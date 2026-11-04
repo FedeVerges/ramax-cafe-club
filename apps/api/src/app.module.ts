@@ -10,6 +10,7 @@ import { InventoryModule } from "./modules/inventory/inventory.module";
 import { ProductsModule } from "./modules/products/products.module";
 import { SalesModule } from "./modules/sales/sales.module";
 import { UsersAndRolesModule } from "./modules/users-and-roles/users-and-roles.module";
+import { ClubLocalModule } from "./modules/club-local/club-local.module";
 @Module({
   controllers: [HealthController],
   imports: [
@@ -25,6 +26,7 @@ import { UsersAndRolesModule } from "./modules/users-and-roles/users-and-roles.m
     InventoryModule,
 
     SalesModule,
+    ClubLocalModule,
 
     AuthModule,
     BackupsModule,

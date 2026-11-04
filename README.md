@@ -1,6 +1,6 @@
 # Ramax Café Club
 
-Sistema para una sucursal: acceso del personal, productos, inventario, ventas, comprobantes, anulaciones y copias de seguridad. E0/E1 está implementado y probado en macOS. Socios, puntos, canjes y cloud quedan para E2/E3.
+Sistema para una sucursal: acceso del personal, productos, inventario, ventas, comprobantes, anulaciones y copias de seguridad. E0/E1 está implementado y probado en macOS. E2 tiene implementación local y cloud en entorno de desarrollo; el despliegue y la copia central están pendientes. Canjes corresponde a E3.
 
 ```text
 Navegador → http://localhost:3000
@@ -170,6 +170,8 @@ docs                Alcance, decisiones, operación y maquetas
 - [Registro de la réplica macOS](docs/OPERACION_MAC_LOCAL.md).
 - [Instalación y recuperación Windows](docs/OPERACION_WINDOWS.md).
 - [Implementación y pruebas E0/E1](docs/IMPLEMENTACION_E0_E1.md).
+- [Piloto en Debian 13](docs/OPERACION_DEBIAN_PILOTO.md).
+- [Implementación E2 y pendientes](docs/IMPLEMENTACION_E2.md).
 
 ## Preparar cambios para Git
 
